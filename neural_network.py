@@ -3,186 +3,95 @@ import tensorflow as tf
 import constants
 from tensorflow.python.framework import ops
 
-def create_placeholders(n_x, n_y):
-    """
-    Creates the placeholders for the tensorflow session.
-    
-    Arguments:
-    n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
-    n_y -- scalar, number of classes (from 0 to 5, so -> 6)
-    
-    Returns:
-    X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
-    Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
-    
-    Tips:
-    - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
-      In fact, the number of examples during test/train is different.
-    """
-
-    X = tf.placeholder(tf.float32, shape=(n_x, None))
-    Y = tf.placeholder(tf.float32, shape=(n_y, None))
-    
-    return X, Y
-
+# Uses a xavier initializer to create the starting weights for the neural network and initialize 
+# all biases to zero. Return the weights and biases in a dictionary
 def initialize_parameters():
-    """
-    Initializes parameters to build a neural network with tensorflow. The shapes are:
-                        W1 : [25, 12288]
-                        b1 : [25, 1]
-                        W2 : [12, 25]
-                        b2 : [12, 1]
-                        W3 : [6, 12]
-                        b3 : [6, 1]
-    
-    Returns:
-    parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3
-    """
-        
-    W1 = tf.get_variable("W1", [constants.HIDDEN_LAYER_1_SIZE, constants.NN_INPUT_SIZE], initializer = tf.contrib.layers.xavier_initializer())
-    b1 = tf.get_variable("b1", [constants.HIDDEN_LAYER_1_SIZE,1], initializer = tf.zeros_initializer())
-    W2 = tf.get_variable("W2", [constants.HIDDEN_LAYER_2_SIZE, constants.HIDDEN_LAYER_1_SIZE], initializer = tf.contrib.layers.xavier_initializer())
-    b2 = tf.get_variable("b2", [constants.HIDDEN_LAYER_2_SIZE,1], initializer = tf.zeros_initializer())
-    W3 = tf.get_variable("W3", [1,constants.HIDDEN_LAYER_2_SIZE], initializer = tf.contrib.layers.xavier_initializer())
-    b3 = tf.get_variable("b3", [1,1], initializer = tf.zeros_initializer())
+    # Initialize weights and biases
+    l1_weights = tf.get_variable("l1_weights", [constants.HIDDEN_LAYER_1_SIZE, constants.NN_INPUT_SIZE], initializer = tf.contrib.layers.xavier_initializer())
+    l1_biases = tf.get_variable("l1_biases", [constants.HIDDEN_LAYER_1_SIZE, 1], initializer = tf.zeros_initializer())
+    l2_weights = tf.get_variable("l2_weights", [constants.OUTPUT_LAYER_SIZE, constants.HIDDEN_LAYER_1_SIZE], initializer = tf.contrib.layers.xavier_initializer())
+    l2_biases = tf.get_variable("l2_biases", [constants.OUTPUT_LAYER_SIZE, 1], initializer = tf.zeros_initializer())
 
-    parameters = {"W1": W1,
-                  "b1": b1,
-                  "W2": W2,
-                  "b2": b2,
-                  "W3": W3,
-                  "b3": b3}
+    # Save weights and biases onto a dictionary
+    parameters = {"l1_weights": l1_weights, "l1_biases": l1_biases, "l2_weights": l2_weights, "l2_biases": l2_biases}
     
     return parameters
 
+# Given a dataset containing the input for the neural network <X> and the parameters for the
+# neural network <parameters>, returns the value of the output node for the neural network after
+# forward propagation. Note that the sigmoid function has not yet been applied to the output node
 def forward_propagation(X, parameters):
-    """
-    Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
+    hidden_layer = tf.add(tf.matmul(parameters['l1_weights'], X), parameters['l1_biases'])
+    hidden_layer = tf.nn.relu(hidden_layer)
+    output_layer = tf.add(tf.matmul(parameters['l2_weights'], hidden_layer), parameters['l2_biases'])
     
-    Arguments:
-    X -- input dataset placeholder, of shape (input size, number of examples)
-    parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3"
-                  the shapes are given in initialize_parameters
+    return output_layer
 
-    Returns:
-    Z3 -- the output of the last LINEAR unit
-    """
-    
-    # Retrieve the parameters from the dictionary "parameters" 
-    W1 = parameters['W1']
-    b1 = parameters['b1']
-    W2 = parameters['W2']
-    b2 = parameters['b2']
-    W3 = parameters['W3']
-    b3 = parameters['b3']
-    
-    Z1 = tf.add(tf.matmul(W1, X), b1)                      
-    A1 = tf.nn.relu(Z1)                                    
-    Z2 = tf.add(tf.matmul(W2, A1), b2)                     
-    A2 = tf.nn.relu(Z2)                                    
-    Z3 = tf.add(tf.matmul(W3, A2), b3)                     
-    
-    return Z3
 
-def compute_cost(Z3, Y):
-    """
-    Computes the cost
-    
-    Arguments:
-    Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
-    Y -- "true" labels vector placeholder, same shape as Z3
-    
-    Returns:
-    cost - Tensor of the cost function
-    """
-    
-    # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-    logits = tf.transpose(Z3)
-    labels = tf.transpose(Y)
-    
-    cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=labels))
-    
-    return cost
+# Given two sets of data, one for training and the other for testing, implements a 
+# shallow, two-layer neural network. This function returns a dictionary containing the 
+# weights and biases that the model learned from the training set.
+def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001, num_epochs = 2000, batch_size = 50):
 
-def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
-          num_epochs = 2000, minibatch_size = 50, print_cost = True):
-    """
-    Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
-    
-    Arguments:
-    X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
-    Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
-    X_test -- training set, of shape (input size = 12288, number of training examples = 120)
-    Y_test -- test set, of shape (output size = 6, number of test examples = 120)
-    learning_rate -- learning rate of the optimization
-    num_epochs -- number of epochs of the optimization loop
-    minibatch_size -- size of a minibatch
-    print_cost -- True to print the cost every 100 epochs
-    
-    Returns:
-    parameters -- parameters learnt by the model. They can then be used to predict.
-    """
+    ops.reset_default_graph()
 
-    ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
-    (n_x, m) = X_train.shape                          # (n_x: input size, m : number of examples in the train set)
-    n_y = Y_train.shape[0]                            # n_y : output size
-    costs = []                                        # To keep track of the cost
+    # Initialize relevant variables
+    num_train_examples = X_train.shape[1]
+    input_size = X_train.shape[0]
+    output_size = Y_train.shape[0]
     
-    # Create Placeholders of shape (n_x, n_y)
-    X, Y = create_placeholders(n_x, n_y)
+    X = tf.placeholder(tf.float32, shape=(input_size, None))
+    Y = tf.placeholder(tf.float32, shape=(output_size, None))
 
     # Initialize parameters
     parameters = initialize_parameters()
     
-    # Forward propagation: Build the forward propagation in the tensorflow graph
-    Z3 = forward_propagation(X, parameters)
+    # Tensorflow graph for forward propagation
+    prediction = forward_propagation(X, parameters)
     
-    # Cost function: Add cost function to tensorflow graph
-    cost = compute_cost(Z3, Y)
+    # Tensorflow graph for the cost function
+    cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=tf.transpose(prediction), labels=tf.transpose(Y)))
     
-    # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
+    # Back propagation using Adam Optimizer
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(cost)
     
-    # Initialize all the variables
+    # Initialize variables
     init = tf.global_variables_initializer()
 
-    # Start the session to compute the tensorflow graph
+    # Start session
     with tf.Session() as sess:
         
-        # Run the initialization
+        # Run initialization
         sess.run(init)
         
-        # Do the training loop
+        # Train the network
         for epoch in range(num_epochs):
-
-            epoch_cost = 0.                       # Defines a cost related to an epoch
-
+            
+            epoch_cost = 0.
             batch_index = 0
 
-            while batch_index < X_train.shape[1]:
+            while batch_index < num_train_examples:
                 start = batch_index
-                end = batch_index+minibatch_size
-                batch_x = np.array(X_train[0:None, start:end])
-                batch_y = np.array(Y_train[0:None, start:end])
+                end = batch_index+batch_size
+                X_batch = np.array(X_train[0:None, start:end])
+                Y_batch = np.array(Y_train[0:None, start:end])
 
-                _, c = sess.run([optimizer, cost], feed_dict={X: batch_x, Y: batch_y})
+                _, c = sess.run([optimizer, cost], feed_dict={X: X_batch, Y: Y_batch})
 
                 epoch_cost += c
-                batch_index += minibatch_size
+                batch_index += batch_size
 
-            if print_cost == True and epoch % 100 == 0:
+            if epoch % 100 == 0:
                 print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
 
-        # lets save the parameters in a variable
+        # Save parameters
         parameters = sess.run(parameters)
-        print ("Parameters have been trained!")
 
-        # Calculate the correct predictions
-        correct_prediction = tf.equal(tf.round(tf.sigmoid(Z3)), Y)
+        # Calculate accuracy
+        correct = tf.equal(tf.round(tf.sigmoid(prediction)), Y)
+        accuracy = tf.reduce_mean(tf.cast(correct, "float"))
 
-        # Calculate accuracy on the test set
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
+        # Print accuracy on training set and testing set
         print ("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train}))
         print ("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test}))
         

@@ -10,12 +10,12 @@ from screencapture import capture_screen
 from preparedata import rgbaImg2nnInput
 
 # Jumps if the output for the forward propagation algorithm is positive and stays put otherwise.
-# Jumping when Z3 is positive and staying put when Z3 is negative is equivalent to computing
-# the activation, A3, of Z3 using a sigmoid function and jumping when A3 is > .5 and staying
+# Jumping when nn_output is positive and staying put when nn_output is negative is equivalent to computing
+# the activation, A3, of nn_output using a sigmoid function and jumping when A3 is > .5 and staying
 # put when A3 is < .5
-def perform_action(Z3):
-	time.sleep(.15)
-	if Z3 >= 0:
+def perform_action(nn_output):
+	time.sleep(constants.REFLEX_DELAY)
+	if nn_output >= 0:
 		pyautogui.press('up')
 	return
 
@@ -43,8 +43,8 @@ def play_game():
 			nnInput = rgbaImg2nnInput(rgba_img)
 
 			# Predict and perform the next move
-			Z3 = sess.run(prediction, feed_dict={X: nnInput})
-			perform_action(Z3[0][0])
+			nn_output = sess.run(prediction, feed_dict={X: nnInput})
+			perform_action(nn_output[0][0])
 
 play_game()
 

@@ -20,6 +20,13 @@ NN_INPUT_SIZE = THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT
 # Proportion of data to be allocated for training
 PERCENT_FOR_TRAINING = .9
 
-# Number of nodes in each hidden layer of the neural network
-HIDDEN_LAYER_1_SIZE = 25
-HIDDEN_LAYER_2_SIZE = 12
+# Number of nodes in each layer of the neural network
+HIDDEN_LAYER_1_SIZE = 1024
+# HIDDEN_LAYER_1_SIZE = 32
+# HIDDEN_LAYER_2_SIZE = 16
+OUTPUT_LAYER_SIZE = 1
+
+# A number in seconds that accounts for the reflex time
+# of the person who created the training data. The program
+# will wait for this long after its decided what move to make
+REFLEX_DELAY = .1
